@@ -1,5 +1,4 @@
 from simulator.node import Node
-import simpy
 
 class PBFTNode(Node):
     """
@@ -14,6 +13,7 @@ class PBFTNode(Node):
         self.commits = set()
         self.round_started = False
         self.round_start_time = None
+        self.commit_sent = False  # флаг отправки COMMIT в текущем раунде
 
     # ===========================
     # Запуск раунда
@@ -41,8 +41,8 @@ class PBFTNode(Node):
         elif msg == "PREPARE":
             self.prepares.add(src)
             # Если получено 2f+1 PREPARE, рассылаем COMMIT
-            if len(self.prepares) >= 2 * self.f + 1 and "COMMIT_SENT" not in self.__dict__:
-                self.__dict__["COMMIT_SENT"] = True
+            if len(self.prepares) >= 2 * self.f + 1 and not self.commit_sent:
+                self.commit_sent = True
                 for i in range(self.n):
                     self.send(i, "COMMIT")
 
@@ -61,13 +61,14 @@ class PBFTNode(Node):
         else:
             round_time = self.env.now - self.round_start_time  # считаем длительность раунда
 
-        if self.node_id == 0:
-            self.metrics.record_round_finished("global", round_time)
+        # Каждый узел фиксирует своё время раунда для честной статистики
+        self.metrics.record_round_finished(self.node_id, round_time)
         # Сбрасываем счётчики для возможного следующего раунда
         self.prepares.clear()
         self.commits.clear()
         self.round_started = False
         self.round_start_time = None
+        self.commit_sent = False  # сбрасываем для следующего раунда
 
         self.env.process(self._start_next_round())
 

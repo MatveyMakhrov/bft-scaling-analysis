@@ -10,6 +10,7 @@ class IBFTNode(Node):
         self.round_number = 0
         self.round_started = False
         self.round_start_time = None  # для замера времени раунда
+        self.commit_sent = False  # флаг отправки COMMIT в текущем раунде
 
     # ===========================
     # Запуск нового раунда
@@ -36,8 +37,8 @@ class IBFTNode(Node):
 
         elif msg == "PREPARE":
             self.prepares.add(src)
-            if len(self.prepares) >= 2 * self.f + 1 and "COMMIT_SENT" not in self.__dict__:
-                self.__dict__["COMMIT_SENT"] = True
+            if len(self.prepares) >= 2 * self.f + 1 and not self.commit_sent:
+                self.commit_sent = True
                 for i in range(self.n):
                     self.send(i, "COMMIT")
 
@@ -54,12 +55,13 @@ class IBFTNode(Node):
         if self.round_start_time is not None:
             round_time = self.env.now - self.round_start_time
 
-        if self.node_id == 0:
-            self.metrics.record_round_finished("global", round_time)
+        # Каждый узел фиксирует своё время раунда для честной статистики
+        self.metrics.record_round_finished(self.node_id, round_time)
         self.round_started = False
         self.prepares.clear()
         self.commits.clear()
         self.round_start_time = None
+        self.commit_sent = False  # сбрасываем для следующего раунда
 
         self.env.process(self._start_next_round())
 

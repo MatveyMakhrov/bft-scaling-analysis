@@ -1,4 +1,3 @@
-import simpy
 from simulator.node import Node
 
 class HBBFTNode(Node):
@@ -58,8 +57,8 @@ class HBBFTNode(Node):
             round_time = self.env.now - self.round_start_time
         else:
             round_time = None
-        if self.node_id == 0:
-            self.metrics.record_round_finished("global", round_time)
+        # Каждый узел фиксирует своё время раунда для честной статистики
+        self.metrics.record_round_finished(self.node_id, round_time)
         self.round_started = False
 
         self.env.process(self._start_next_round())
@@ -68,4 +67,3 @@ class HBBFTNode(Node):
     def _start_next_round(self):
         yield self.env.timeout(1)
         self.start_round()
-

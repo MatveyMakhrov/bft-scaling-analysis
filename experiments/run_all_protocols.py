@@ -23,7 +23,7 @@ from protocols.rbft import RBFTNode
 # -----------------------------
 # Настройки эксперимента
 # -----------------------------
-NUM_NODES_LIST = [1, 4, 8, 16]        # количество узлов для теста
+NUM_NODES_LIST = [4, 8, 16, 32, 64, 128, 256]  # минимум 4 узла (f=1): n=1 не имеет смысла для BFT
 FRACTION_BYZANTINE = 1/3           # число допустимых злонамеренных узлов
 BATCH_SIZE = 2
 ROUND_DELAY = 10
@@ -42,6 +42,12 @@ PROTOCOLS = {
 # Функция запуска симуляции
 # -----------------------------
 def run_simulation(protocol_cls, num_nodes):
+    if num_nodes < 4:
+        raise ValueError(
+            f"num_nodes={num_nodes} слишком мало для BFT-протокола. "
+            f"Минимум 4 узла (даёт f=1 Byzantine-устойчивость). "
+            f"При n=1 или n=3: f=0, консенсус вырожден и некорректен."
+        )
     env = simpy.Environment()
     f = num_nodes // 3  # допустимые Byzantine узлы
     metrics = Metrics()
@@ -54,7 +60,7 @@ def run_simulation(protocol_cls, num_nodes):
             node = protocol_cls(env, i, network, metrics, num_nodes, f, BATCH_SIZE)
         else:
             node = protocol_cls(env, i, network, metrics, num_nodes, f)
-        network.nodes[i] = node
+        network.register(node)
         nodes.append(node)
         env.process(node.run())
 
@@ -130,22 +136,23 @@ plt.figure(figsize=(18, 5))
 plt.subplot(1, 3, 1)
 sns.lineplot(data=df, x="num_nodes", y="avg_round_time", hue="protocol", marker="o")
 plt.title("Среднее время раунда для разных протоколов")
-plt.xlabel("Количество узлов")
-plt.ylabel("Среднее время раунда")
+plt.xlabel("Количество узлов (шт.)")
+plt.ylabel("Среднее время раунда (симуляционных единиц)")
 
-# Количество сообщений
+# Количество сообщений (логарифмическая шкала — протоколы отличаются на порядки)
 plt.subplot(1, 3, 2)
 sns.lineplot(data=df, x="num_nodes", y="messages_sent", hue="protocol", marker="o")
-plt.title("Количество отправленных сообщений")
-plt.xlabel("Количество узлов")
-plt.ylabel("Число отправленных сообщений")
+plt.yscale("log")
+plt.title("Количество отправленных сообщений (log scale)")
+plt.xlabel("Количество узлов (шт.)")
+plt.ylabel("Число отправленных сообщений (шт., лог. шкала)")
 
 # Пропускная способность
 plt.subplot(1, 3, 3)
 sns.lineplot(data=df, x="num_nodes", y="throughput", hue="protocol", marker="o")
 plt.title("Пропускная способность протоколов")
-plt.xlabel("Количество узлов")
-plt.ylabel("Пропускная способность (раунды / единицу времени)")
+plt.xlabel("Количество узлов (шт.)")
+plt.ylabel("Пропускная способность (раундов / сим. единицу времени)")
 
 plt.tight_layout()
 plt.show()
